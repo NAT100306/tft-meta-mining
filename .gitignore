@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Large datasets (>100MB violates GitHub limits)
+data/raw/*.csv
+data/raw/*.json
+data/processed/
+
+# OS files
+.DS_Store
+Thumbs.db
