@@ -34,13 +34,15 @@ class AssociationRuleMiner:
 
     def __init__(
         self,
-        min_support: float = 0.02,
+        min_support: float = 0.03,
         min_confidence: float = 0.5,
         min_lift: float = 1.0,
+        max_len: Optional[int] = 3,
     ) -> None:
         self.min_support = min_support
         self.min_confidence = min_confidence
         self.min_lift = min_lift
+        self.max_len = max_len
 
     # ------------------------------------------------------------------
     # Core mining helpers
@@ -82,6 +84,7 @@ class AssociationRuleMiner:
             binary_df,
             min_support=self.min_support,
             use_colnames=True,
+            max_len=self.max_len,
         )
 
         # --- Association rules ---
