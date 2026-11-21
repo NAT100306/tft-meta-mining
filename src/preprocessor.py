@@ -289,4 +289,4 @@ if __name__ == "__main__":
         print("\n✅ Preprocessor demo complete!")
     else:
         print(f"⚠️ Data file not found: {data_path}")
-        print("  Run data_generator.py first!")
+        print("  Please download and prepare the dataset in data/raw/tft_matches.csv first!")

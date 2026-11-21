@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import Counter
