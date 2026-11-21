@@ -37,7 +37,7 @@ class AssociationRuleMiner:
         min_support: float = 0.03,
         min_confidence: float = 0.5,
         min_lift: float = 1.0,
-        max_len: Optional[int] = 3,
+        max_len: Optional[int] = 4,
     ) -> None:
         self.min_support = min_support
         self.min_confidence = min_confidence

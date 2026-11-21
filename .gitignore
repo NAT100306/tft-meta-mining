@@ -11,6 +11,10 @@ __pycache__/
 data/raw/*.csv
 data/raw/*.json
 data/processed/
+data/kaggle_raw/
+
+# Office temp lock files
+~$*
 
 # OS files
 .DS_Store
