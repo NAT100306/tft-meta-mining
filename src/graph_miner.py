@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import Counter
@@ -84,9 +85,11 @@ class GraphMiner:
     def compute_centrality_metrics(self, G: nx.Graph = None) -> pd.DataFrame:
         """Tính tất cả centrality metrics."""
         G = G or self.G
+        for u, v, attrs in G.edges(data=True):
+            attrs["distance"] = 1.0 / attrs["weight"]
         metrics = {
             "degree": nx.degree_centrality(G),
-            "betweenness": nx.betweenness_centrality(G, weight="weight"),
+            "betweenness": nx.betweenness_centrality(G, weight="distance"),
             "closeness": nx.closeness_centrality(G),
         }
         try:
@@ -112,7 +115,7 @@ class GraphMiner:
         if community_louvain is None:
             raise ImportError("pip install python-louvain")
 
-        partition = community_louvain.best_partition(G, weight="weight", resolution=resolution)
+        partition = community_louvain.best_partition(G, weight="weight", resolution=resolution, random_state=42)
         modularity = community_louvain.modularity(partition, G, weight="weight")
 
         # Summary
@@ -142,8 +145,7 @@ class GraphMiner:
         """
         G = G or self.G
         if ig is None or leidenalg is None:
-            print("⚠️ leidenalg/igraph not installed. Falling back to Louvain.")
-            return self.detect_communities_louvain(G, resolution)
+            raise ImportError("Install igraph and leidenalg to run Leiden; do not substitute Louvain")
 
         # Convert networkx → igraph
         mapping = {node: i for i, node in enumerate(G.nodes())}
@@ -160,6 +162,7 @@ class GraphMiner:
             leidenalg.RBConfigurationVertexPartition,
             weights="weight",
             resolution_parameter=resolution,
+            seed=42,
         )
 
         # Convert back
@@ -168,7 +171,7 @@ class GraphMiner:
             for member_idx in members:
                 partition[reverse_mapping[member_idx]] = comm_id
 
-        modularity = partition_obj.modularity
+        modularity = nx.community.modularity(G, [set(reverse_mapping[i] for i in group) for group in partition_obj], weight="weight")
 
         # Summary
         comm_members = {}
@@ -288,7 +291,7 @@ class GraphMiner:
         # Colors by community
         if partition:
             communities = set(partition.values())
-            cmap = plt.cm.get_cmap("tab20", len(communities))
+            cmap = plt.colormaps["tab20"].resampled(len(communities))
             node_colors = [cmap(partition.get(n, 0)) for n in G.nodes()]
         else:
             node_colors = "skyblue"

@@ -19,3 +19,8 @@ data/kaggle_raw/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Logs & test execution results
+*.log
+*execution_results.json
+RUN_NOTES.txt

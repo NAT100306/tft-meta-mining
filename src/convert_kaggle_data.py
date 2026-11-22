@@ -11,8 +11,9 @@ import pandas as pd
 import numpy as np
 
 def convert_kaggle_dataset():
-    raw_dir = r"d:\data_mining\tft-meta-mining\data\kaggle_raw"
-    output_dir = r"d:\data_mining\tft-meta-mining\data\raw"
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    raw_dir = os.path.join(root_dir, "data", "kaggle_raw")
+    output_dir = os.path.join(root_dir, "data", "raw")
     os.makedirs(output_dir, exist_ok=True)
     
     target_csv = os.path.join(output_dir, "tft_matches.csv")
@@ -88,3 +89,4 @@ def convert_kaggle_dataset():
 
 if __name__ == "__main__":
     convert_kaggle_dataset()
+

@@ -221,82 +221,41 @@ class AssociationRuleMiner:
     # Contrast-set mining
     # ------------------------------------------------------------------
 
-    def contrast_set_mining(
-        self,
-        win_transactions_df: pd.DataFrame,
-        lose_transactions_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Identify *meta-defining* rules that appear (or are significantly
-        stronger) in the **Win** set compared to the **Lose** set.
-
-        Parameters
-        ----------
-        win_transactions_df : pd.DataFrame
-            One-hot encoded transactions for winning matches.
-        lose_transactions_df : pd.DataFrame
-            One-hot encoded transactions for losing matches.
-
-        Returns
-        -------
-        contrast_rules : pd.DataFrame
-            Rules enriched with ``win_support``, ``win_confidence``,
-            ``lose_support``, ``lose_confidence``, and their deltas.
-            Only rules whose support or confidence is *higher* in the
-            win set are returned, sorted by ``confidence_diff`` descending.
-        """
-        _, win_rules, _ = self.run_fpgrowth(win_transactions_df, win_label=True)
-        _, lose_rules, _ = self.run_fpgrowth(lose_transactions_df, win_label=False)
-
-        if win_rules.empty:
-            return pd.DataFrame()
-
-        # Build a lookup from (antecedents, consequents) -> metrics for loses
-        lose_lookup: Dict[Tuple, Dict] = {}
-        if not lose_rules.empty:
-            for _, row in lose_rules.iterrows():
-                key = (frozenset(row["antecedents"]), frozenset(row["consequents"]))
-                lose_lookup[key] = {
-                    "lose_support": row["support"],
-                    "lose_confidence": row["confidence"],
-                    "lose_lift": row["lift"],
-                }
-
-        contrast_rows: List[Dict] = []
+    def contrast_set_mining(self, win_transactions_df, lose_transactions_df, win_rules=None):
+        """Evaluate each winning rule on ALL losing transactions, even below mining thresholds."""
+        if win_rules is None:
+            _, win_rules, _ = self.run_fpgrowth(win_transactions_df, win_label=True)
+        columns = ["antecedents", "consequents", "win_support", "win_confidence", "win_lift",
+                   "lose_support", "lose_confidence", "lose_lift", "support_diff", "confidence_diff", "lift_diff"]
+        if len(lose_transactions_df) == 0:
+            raise ValueError("Contrast requires losing transactions")
+        # Bitsets avoid materializing a full row-by-candidate array for each rule.
+        packed = {c: np.packbits(lose_transactions_df[c].to_numpy(dtype=bool)) for c in lose_transactions_df.columns}
+        bitcount = np.array([int(i).bit_count() for i in range(256)], dtype=np.uint8)
+        cache = {}
+        def support(items):
+            key = frozenset(items)
+            if key not in cache:
+                if any(c not in packed for c in key):
+                    cache[key] = 0.0
+                else:
+                    arrays = [packed[c] for c in sorted(key)]
+                    values = arrays[0].copy()
+                    for other in arrays[1:]: values &= other
+                    cache[key] = float(bitcount[values].sum() / len(lose_transactions_df))
+            return cache[key]
+        result = []
         for _, row in win_rules.iterrows():
-            key = (frozenset(row["antecedents"]), frozenset(row["consequents"]))
-            lose_metrics = lose_lookup.get(
-                key, {"lose_support": 0.0, "lose_confidence": 0.0, "lose_lift": 0.0}
-            )
-
-            support_diff = row["support"] - lose_metrics["lose_support"]
-            confidence_diff = row["confidence"] - lose_metrics["lose_confidence"]
-            lift_diff = row["lift"] - lose_metrics["lose_lift"]
-
-            # Keep rule if it is stronger in the win set
-            if support_diff > 0 or confidence_diff > 0:
-                contrast_rows.append(
-                    {
-                        "antecedents": row["antecedents"],
-                        "consequents": row["consequents"],
-                        "win_support": row["support"],
-                        "win_confidence": row["confidence"],
-                        "win_lift": row["lift"],
-                        "lose_support": lose_metrics["lose_support"],
-                        "lose_confidence": lose_metrics["lose_confidence"],
-                        "lose_lift": lose_metrics["lose_lift"],
-                        "support_diff": round(support_diff, 4),
-                        "confidence_diff": round(confidence_diff, 4),
-                        "lift_diff": round(lift_diff, 4),
-                    }
-                )
-
-        if not contrast_rows:
-            return pd.DataFrame()
-
-        contrast_df = pd.DataFrame(contrast_rows)
-        contrast_df.sort_values("confidence_diff", ascending=False, inplace=True)
-        contrast_df.reset_index(drop=True, inplace=True)
-        return contrast_df
+            a,b = row.antecedents,row.consequents
+            sa,sb,sab = support(a),support(b),support(a|b)
+            conf = sab/sa if sa else 0.0
+            lift = sab/(sa*sb) if sa and sb else 0.0
+            if row.support > sab or row.confidence > conf:
+                result.append(dict(antecedents=a,consequents=b,win_support=row.support,
+                    win_confidence=row.confidence,win_lift=row.lift,lose_support=sab,
+                    lose_confidence=conf,lose_lift=lift,support_diff=row.support-sab,
+                    confidence_diff=row.confidence-conf,lift_diff=row.lift-lift))
+        return pd.DataFrame(result,columns=columns).sort_values("confidence_diff",ascending=False).reset_index(drop=True)
 
     # ------------------------------------------------------------------
     # Filtering utilities
